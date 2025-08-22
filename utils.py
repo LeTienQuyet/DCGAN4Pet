@@ -22,14 +22,19 @@ class PetDataset(Dataset):
         return img
 
 def prepare_data(root_dir="datasets", batch_size=128):
-    transform = transforms.Compose([
+    transform_train = transforms.Compose([
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
 
-    train_dataset = PetDataset(os.path.join(root_dir, "train"), transform)
-    dev_dataset = PetDataset(os.path.join(root_dir, "dev"), transform)
+    transform_dev = transforms.Compose([
+        transforms.Resize((299, 299)),
+        transforms.ToTensor(),
+    ])
+
+    train_dataset = PetDataset(os.path.join(root_dir, "train"), transform_train)
+    dev_dataset = PetDataset(os.path.join(root_dir, "dev"), transform_dev)
 
     train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, pin_memory=True)
     dev_dataloader = DataLoader(dev_dataset, batch_size, shuffle=False, pin_memory=True)
