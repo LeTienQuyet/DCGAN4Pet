@@ -16,8 +16,7 @@ def calculate_fid_score(generator, dev_dataloader, batch_size=128, num_dims=100,
             fake_images = generator(noises)
 
             # Range from [-1, 1] to [0, 1]
-            fake_images = (fake_images + 1) / 2
-            fake_images = fake_images.clamp(0, 1)
+            fake_images = fake_images.mul(0.5).add(0.5).clamp(0, 1)
 
             # Resize 64 x 64 => 299 x 299
             fake_images = F.interpolate(fake_images, size=(299, 299), mode="bilinear", align_corners=False)
