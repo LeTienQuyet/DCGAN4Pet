@@ -36,7 +36,7 @@ def prepare_data(root_dir="datasets", batch_size=128):
     train_dataset = PetDataset(os.path.join(root_dir, "train"), transform_train)
     dev_dataset = PetDataset(os.path.join(root_dir, "dev"), transform_dev)
 
-    train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, pin_memory=True, num_workers=4)
-    dev_dataloader = DataLoader(dev_dataset, batch_size, shuffle=False, pin_memory=True, num_workers=4)
+    train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, pin_memory=True, num_workers=2)
+    dev_dataloader = DataLoader(dev_dataset, batch_size, shuffle=False, pin_memory=True, num_workers=2)
 
     return train_dataloader, dev_dataloader
