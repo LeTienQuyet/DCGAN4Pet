@@ -26,7 +26,7 @@ def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, c
         batch = real_data.size(0)
 
         # Training Discriminator
-        dis.zero_grad()
+        disOptimizer.zero_grad()
             # For real data
         label = torch.full((batch, ), real_label, device=device)
         output = dis(real_data)
@@ -47,7 +47,7 @@ def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, c
         disOptimizer.step()
 
         # Trainging Generator
-        gen.zero_grad()
+        genOptimizer.zero_grad()
         label.fill_(real_label)
         output = dis(fake_data)
         lossGen = criterion(output, label)
