@@ -21,7 +21,7 @@ def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, c
     total_lossGen, total_lossDis = 0.0, 0.0
 
     real_label, fake_label = 1.0, 0.0
-    for img in tqdm(train_dataloader, desc=f"Epoch {epoch+1}", unit="batch", colour="RED"):
+    for img in tqdm(train_dataloader, desc=f"Epoch {epoch}", unit="batch", colour="RED"):
         real_data = img.to(device)
         batch = real_data.size(0)
 
@@ -70,6 +70,8 @@ def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, c
     return total_lossGen, total_lossDis
 
 def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, save_pth):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # Make a folder save checkpoint
     os.makedirs(save_pth, exist_ok=True)
 
@@ -79,11 +81,11 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
     seed = 412
     random.seed(seed)
     torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
     # Prepare data for training and evaluation
     train_dataloader, dev_dataloader = prepare_data(root_dir, batch_size)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create Generator with weights have mean = 0, std = 0.02
     gen = Generator(num_dims=num_dims).to(device)
@@ -93,14 +95,18 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
     dis = Discriminator().to(device)
     dis.apply(weights_init)
 
+    gen_params = sum(p.numel() for p in gen.parameters() if p.requires_grad)
+    dis_params = sum(p.numel() for p in dis.parameters() if p.requires_grad)
+
     # Create Adam optimizer with lr = 0.0002, beta1 = 0.5, beta2 = 0.999
     genOptimizer = optim.Adam(gen.parameters(), lr, (beta1, beta2))
     disOptimizer = optim.Adam(dis.parameters(), lr, (beta1, beta2))
 
     # Create loss function
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     print(f"Details of Training:")
+    print(f"    Total params {gen_params + dis_params:,}")
     print(f"    Epochs = {num_epochs}, Batch size = {batch_size}, Latent dims = {num_dims}, Device = {device}")
     print(f"    Optimizer with Learning rate = {lr}, betas = {beta1, beta2}")
     print("Ready Training !!!")
@@ -113,7 +119,7 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
     ax.axis("off")
     fake_images_list = []
 
-    for epoch in range(num_epochs):
+    for epoch in range(1, num_epochs+1):
         total_lossGen, total_lossDis = train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, criterion, num_dims, device, save_pth)
         lossesDis.append(total_lossDis)
         lossesGen.append(total_lossGen)
@@ -131,10 +137,10 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
                 os.path.join(save_pth, "discriminator_best.pt")
             )
             best_fid_score = fid_score
-            print(f"Save best model at epoch {epoch+1} !!!")
+            print(f"Save best model at epoch {epoch} !!!\n")
 
         # Generate fake images
-        if epoch % step == 0 or epoch == num_epochs-1:
+        if epoch % step == 0 or epoch == 1:
             with torch.no_grad():
                 fake_images = gen(fixed_noises).detach().cpu()
                 grid = make_grid(fake_images, nrow=8, padding=2, normalize=True)
@@ -142,7 +148,7 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
 
                 im = ax.imshow(img, animated=True)
                 txt = ax.text(
-                    0.5, 1.05, f"Epoch {epoch + 1}",
+                    0.5, 1.05, f"Epoch {epoch}",
                     transform=ax.transAxes,
                     ha="center", va="bottom",
                     fontsize=14, color="red"
