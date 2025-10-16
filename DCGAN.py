@@ -45,14 +45,14 @@ class Generator(nn.Module):
         # ( 32 x 32 x 128 => 64 x 64 x 3)
         self.trconv5 = nn.ConvTranspose2d(
             in_channels=128, out_channels=num_channels,
-            kernel_size=4, stride=2, padding=1, bias=False
+            kernel_size=4, stride=2, padding=1, bias=True
         )
 
     def forward(self, x):
-        x = F.relu(self.bn1(self.trconv1(x)))
-        x = F.relu(self.bn2(self.trconv2(x)))
-        x = F.relu(self.bn3(self.trconv3(x)))
-        x = F.relu(self.bn4(self.trconv4(x)))
+        x = F.gelu(self.bn1(self.trconv1(x)))
+        x = F.gelu(self.bn2(self.trconv2(x)))
+        x = F.gelu(self.bn3(self.trconv3(x)))
+        x = F.gelu(self.bn4(self.trconv4(x)))
         x = torch.tanh(self.trconv5(x))
         return x
 
@@ -63,7 +63,7 @@ class Discriminator(nn.Module):
         # ( 64 x 64 x 3 => 32 x 32 x 64)
         self.conv1 = nn.Conv2d(
             in_channels=num_channels, out_channels=64,
-            kernel_size=4, stride=2, padding=1, bias=False
+            kernel_size=4, stride=2, padding=1, bias=True
         )
 
         # ( 32 x 32 x 64 => 16 x 16 x 128)
@@ -90,7 +90,7 @@ class Discriminator(nn.Module):
         # ( 4 x 4 x 512 => 1 x 1 x 1)
         self.conv5 = nn.Conv2d(
             in_channels=512, out_channels=1,
-            kernel_size=4, stride=1, padding=0, bias=False
+            kernel_size=4, stride=1, padding=0, bias=True
         )
 
     def forward(self, x):
@@ -98,6 +98,6 @@ class Discriminator(nn.Module):
         x = F.leaky_relu(self.bn2(self.conv2(x)), 0.2, True)
         x = F.leaky_relu(self.bn3(self.conv3(x)), 0.2, True)
         x = F.leaky_relu(self.bn4(self.conv4(x)), 0.2, True)
-        x = torch.sigmoid(self.conv5(x))
+        x = self.conv5(x)
         x = x.view(-1)
         return x
