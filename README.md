@@ -15,12 +15,16 @@ batchnorm to the generator output layer and the discriminator input layer)*.
 ### Discriminator
 ![dcgan_discriminator](images/dcgan_discriminator.png)
 ## Dataset 
-This project uses the **AFHQ-v2 (Animal Faces-HQ v2)** dataset, which contains high-quality animal face images. The original dataset consists of 3 classes: *cat*, *dog*, and *wild (wild animals)*. Only the cat and dog classes are included, while the wild class is excluded. Each image has a resolution of *512×512*. The training set contains *9,743* images, while the development (dev/validation) set contains *984* images.
+This project uses the **AFHQ-v2 (Animal Faces-HQ v2)** dataset, which contains high-quality animal face images. The original dataset consists of 3 classes: *cat*, *dog*, and *wild (wild animals)*. Only the cat and dog classes are included, while the wild class is excluded. Each image has a resolution of *512×512*. However, to enable faster training and more efficient metric evaluation, I use the 64×64 version available on [Hugging Face](https://huggingface.co/datasets/reese-green/afhq64_16k). The training set contains *9,892* images, while the development (dev/validation) set contains *1,000* images.
 <p align="center">
   <img src="images/training_images.png" alt="Training Images"/>
 </p>
 
 ## Experiment
+|      Model         |  FID score     |  Describe                                      |
+| :---------------:  | :--------:     | :--------:                                     | 
+| DCGAN v.0          |  43.1442       |      Implemented as in the DCGAN paper         |
+| DCGAN v.1          |  37.3660       |   Replacing ReLU with GeLU in Generator        |
 ### Setting for training
 * **Input normalization**: *scale input images to range [-1,1] (to match the Tanh output the Generator).*
 * **Weight initialization**: *initialize weights from a normal distribution ~ N(0, 0.02).*
