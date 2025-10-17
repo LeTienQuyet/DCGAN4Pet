@@ -4,7 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import argparse
 
-def main(num_images=64, filename="default", gen_ckpt="models/generator_best.pt", num_dims=100):
+def main(num_images=64, filename="default", gen_ckpt="checkpoints/generator_best_v1.pt", num_dims=100):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     gen = Generator(num_dims=num_dims).to(device)
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--num_images", type=int, help="Number of images to generate", default=64)
     parser.add_argument("--filename", type=str, help="File name of the image", default="default")
-    parser.add_argument("--gen_ckpt", type=str, help="Checkpoint of generator", default="models/generator_best.pt")
+    parser.add_argument("--gen_ckpt", type=str, help="Checkpoint of generator", default="checkpoints/generator_best_v1.pt")
     parser.add_argument("--num_dims", type=int, help="No. dimensions of latent space", default=100)
 
     args = parser.parse_args()
