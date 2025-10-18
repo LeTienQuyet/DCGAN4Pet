@@ -1,23 +1,34 @@
 import os
-import argparse
 import random
-
-from utils import prepare_data
-from tqdm import tqdm
-from DCGAN import weights_init, Generator, Discriminator
-from calculate_fid_score import calculate_fid_score
-import torch.nn as nn
+import copy
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import torch.nn as nn
 import torch
-from torchvision.utils import make_grid
 import torch.optim as optim
 
-def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, criterion, num_dims, device, save_pth):
+from utils import prepare_data, get_args, plot_loss
+from tqdm import tqdm
+from DCGAN import weights_init, Generator, Discriminator
+from calculate_fid_score import calculate_fid_score
+from torchvision.utils import make_grid
+
+def save_checkpoint(model, filename, save_pth):
+    torch.save(
+        model.state_dict(),
+        os.path.join(save_pth, f"{filename}.pt")
+    )
+
+def update_ema(gen_ema, gen, decay=0.999):
+    with torch.no_grad():
+        for p_ema, p in zip(gen_ema.parameters(), gen.parameters()):
+            p_ema.data.mul_(decay).add_(p.data, alpha=1 - decay)
+
+# Train model in 1 epoch
+def train_model(train_dataloader, epoch, gen, gen_ema, dis, genOptimizer, disOptimizer, criterion, num_dims, device, save_pth, decay):
     gen.train()
     dis.train()
-
     total_lossGen, total_lossDis = 0.0, 0.0
 
     real_label, fake_label = 1.0, 0.0
@@ -37,7 +48,7 @@ def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, c
         noises = torch.randn(batch, num_dims, 1, 1, device=device)
         fake_data = gen(noises)
         label.fill_(fake_label)
-        output = dis(fake_data.detach())
+        output = dis(fake_data.detach()) # Prevent gradient to Generator when training Discriminator
         lossDis_fake = criterion(output, label)
         lossDis_fake.backward()
 
@@ -56,20 +67,18 @@ def train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, c
             # update Generator
         genOptimizer.step()
 
+        # Update EMA
+        update_ema(gen_ema, gen, decay=decay)
+
     # Save last model
-    torch.save(
-        gen.state_dict(),
-        os.path.join(save_pth, "generator_last.pt")
-    )
-    torch.save(
-        dis.state_dict(),
-        os.path.join(save_pth, "discriminator_last.pt")
-    )
+    save_checkpoint(gen, "generator_last", save_pth)
+    save_checkpoint(gen_ema, f"generator_ema_{decay}_last", save_pth)
+    save_checkpoint(dis, "discriminator_last", save_pth)
 
     print(f"    Training Loss:  Generator = {total_lossGen:.4f}, Discriminator = {total_lossDis:.4f}")
     return total_lossGen, total_lossDis
 
-def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, save_pth):
+def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, save_pth, decay):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Make a folder save checkpoint
@@ -90,6 +99,10 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
     # Create Generator with weights have mean = 0, std = 0.02
     gen = Generator(num_dims=num_dims).to(device)
     gen.apply(weights_init)
+
+    gen_ema = copy.deepcopy(gen).eval() # EMA model (for evaluation only)
+    for p in gen_ema.parameters():
+        p.requires_grad_(False)
 
     # Create Discriminator with weights have mean = 0, std = 0.02
     dis = Discriminator().to(device)
@@ -120,29 +133,25 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
     fake_images_list = []
 
     for epoch in range(1, num_epochs+1):
-        total_lossGen, total_lossDis = train_model(train_dataloader, epoch, gen, dis, genOptimizer, disOptimizer, criterion, num_dims, device, save_pth)
+        total_lossGen, total_lossDis = train_model(train_dataloader, epoch, gen, gen_ema, dis, genOptimizer, disOptimizer, criterion, num_dims, device, save_pth, decay)
         lossesDis.append(total_lossDis)
         lossesGen.append(total_lossGen)
 
-        fid_score =  calculate_fid_score(gen, dev_dataloader, batch_size, num_dims, device)
+        fid_score =  calculate_fid_score(gen_ema, dev_dataloader, batch_size, num_dims, device)
         print(f"    FID score = {fid_score}")
         if fid_score < best_fid_score:
             # Save best model
-            torch.save(
-                gen.state_dict(),
-                os.path.join(save_pth, "generator_best.pt")
-            )
-            torch.save(
-                dis.state_dict(),
-                os.path.join(save_pth, "discriminator_best.pt")
-            )
+            save_checkpoint(gen, "generator_best", save_pth)
+            save_checkpoint(gen_ema, f"generator_ema_{decay}_best", save_pth)
+            save_checkpoint(dis, "discriminator_best", save_pth)
+
             best_fid_score = fid_score
             print(f"Save best model at epoch {epoch} !!!\n")
 
         # Generate fake images
         if epoch % step == 0 or epoch == 1:
             with torch.no_grad():
-                fake_images = gen(fixed_noises).detach().cpu()
+                fake_images = gen_ema(fixed_noises).detach().cpu()
                 grid = make_grid(fake_images, nrow=8, padding=2, normalize=True)
                 img = grid.permute(1, 2, 0).numpy()
 
@@ -158,33 +167,12 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
     ani = animation.ArtistAnimation(fig, fake_images_list, interval=1500, repeat_delay=1000, blit=True)
     ani.save(os.path.join(save_pth, "training_image.gif"), writer="pillow")
 
-    print(f"Completed Training with {num_epochs} epochs !!!")
+    plot_loss(num_epochs, lossesGen, lossesDis, save_pth)
 
-    epochs = range(1, num_epochs+1)
-    plt.figure(figsize=(10, 5))
-    plt.plot(epochs, lossesGen, label='Generator Loss', marker='o')
-    plt.plot(epochs, lossesDis, label='Discriminator Loss', marker='o')
-    plt.title('Generator & Discriminator loss arcording to Epoch')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(save_pth, "loss.png"), dpi=300, bbox_inches='tight')
+    print(f"\nCompleted Training with best FID =  {best_fid_score:.4f}  !!!")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Hyper-parameters for training")
-
-    parser.add_argument("--epoch", type=int, help="No. of epochs for training", default=30)
-    parser.add_argument("--root_dir", type=str, help="Directory of dataset", default="datasets")
-    parser.add_argument("--lr", type=float, help="Learning rate", default=0.0002)
-    parser.add_argument("--batch_size", type=int, help="Batch size", default=128)
-    parser.add_argument("--beta1", type=float, help="First betas of optimizer", default=0.5)
-    parser.add_argument("--beta2", type=float, help="Second betas of optimizer", default=0.999)
-    parser.add_argument("--num_dims", type=int, help="No. dimensions of latent space", default=100)
-    parser.add_argument("--step", type=int, help="No. of epoch to save generate images", default=3)
-    parser.add_argument("--save_pth", type=str, help="Directory save anything", default="output")
-
-    args = parser.parse_args()
+    args = get_args()
 
     main(
         num_epochs=args.epoch,
@@ -195,5 +183,6 @@ if __name__ == "__main__":
         beta2=args.beta2,
         num_dims=args.num_dims,
         step=args.step,
-        save_pth=args.save_pth
+        save_pth=args.save_pth,
+        decay=args.decay
     )
