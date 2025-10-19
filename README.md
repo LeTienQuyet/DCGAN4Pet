@@ -25,7 +25,12 @@ This project uses the **AFHQ-v2 (Animal Faces-HQ v2)** dataset, which contains h
 | :---------------:  | :--------:     | :--------:                                     | 
 | DCGAN v.0          |  43.1442       |      Implemented as in the DCGAN paper         |
 | DCGAN v.1          |  37.3660       |   Replacing ReLU with GeLU in Generator        |
+| DCGAN v.2          |  **31.2451**       |   Replacing BatchNorm with PixelNorm and use residual connection in Generator, EMA (decay=0.996) for generate image      |
 ### Setting for training
+All experiments are configured with the same hyper-parameters:
+```python
+epoch = 300, batch_size = 128, latent_dim = 100
+```
 * **Input normalization**: *scale input images to range [-1,1] (to match the Tanh output the Generator).*
 * **Weight initialization**: *initialize weights from a normal distribution ~ N(0, 0.02).*
 * **Optimizer**: *Use Adam optimizer with learning_rate=0.0002, beta1 = 0.5 (instead of the default 0.9).*
