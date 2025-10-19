@@ -10,6 +10,30 @@ def weights_init(w):
         torch.nn.init.normal_(w.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(w.bias.data, 0.0)
 
+class PixelNorm(nn.Module):
+    def __init__(self, eps=1e-8):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, x):
+        return x * torch.rsqrt(torch.mean(x ** 2, dim=1, keepdim=True) + self.eps)
+
+class UpProjection(nn.Module):
+    def __init__(self, in_channels, out_channels, scale_factor=0.1):
+        super().__init__()
+        self.scale_factor = scale_factor
+        self.projection = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False),
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=out_channels,
+                kernel_size=1, stride=1, padding=0, bias=False
+            ),
+            PixelNorm()
+        )
+
+    def forward(self, x):
+        return self.scale_factor * self.projection(x)
+
 class Generator(nn.Module):
     def __init__(self, num_dims=100, num_channels=3):
         super().__init__()
@@ -19,28 +43,31 @@ class Generator(nn.Module):
             in_channels=num_dims, out_channels=1024,
             kernel_size=4, stride=1, padding=0, bias=False
         )
-        self.bn1 = nn.BatchNorm2d(num_features=1024)
+        self.pn1 = PixelNorm()
 
         # ( 4 x 4 x 1024 => 8 x 8 x 512)
         self.trconv2 = nn.ConvTranspose2d(
             in_channels=1024, out_channels=512,
             kernel_size=4, stride=2, padding=1, bias=False
         )
-        self.bn2 = nn.BatchNorm2d(num_features=512)
+        self.residual_2 = UpProjection(in_channels=1024, out_channels=512)
+        self.pn2 = PixelNorm()
 
         # ( 8 x 8 x 512 => 16 x 16 x 256)
         self.trconv3 = nn.ConvTranspose2d(
             in_channels=512, out_channels=256,
             kernel_size=4, stride=2, padding=1, bias=False
         )
-        self.bn3 = nn.BatchNorm2d(num_features=256)
+        self.residual_3 = UpProjection(in_channels=512, out_channels=256)
+        self.pn3 = PixelNorm()
 
         # ( 16 x 16 x 256 => 32 x 32 x 128)
         self.trconv4 = nn.ConvTranspose2d(
             in_channels=256, out_channels=128,
             kernel_size=4, stride=2, padding=1, bias=False
         )
-        self.bn4 = nn.BatchNorm2d(num_features=128)
+        self.residual_4 = UpProjection(in_channels=256, out_channels=128)
+        self.pn4 = PixelNorm()
 
         # ( 32 x 32 x 128 => 64 x 64 x 3)
         self.trconv5 = nn.ConvTranspose2d(
@@ -49,10 +76,17 @@ class Generator(nn.Module):
         )
 
     def forward(self, x):
-        x = F.gelu(self.bn1(self.trconv1(x)))
-        x = F.gelu(self.bn2(self.trconv2(x)))
-        x = F.gelu(self.bn3(self.trconv3(x)))
-        x = F.gelu(self.bn4(self.trconv4(x)))
+        x = F.gelu(self.pn1(self.trconv1(x)))
+
+        residual_2 = self.residual_2(x)
+        x = F.gelu(self.pn2(self.trconv2(x) + residual_2))
+
+        residual_3 = self.residual_3(x)
+        x = F.gelu(self.pn3(self.trconv3(x) + residual_3))
+
+        residual_4 = self.residual_4(x)
+        x = F.gelu(self.pn4(self.trconv4(x) + residual_4))
+
         x = torch.tanh(self.trconv5(x))
         return x
 
