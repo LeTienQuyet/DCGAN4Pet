@@ -2,7 +2,7 @@ from torcheval.metrics import FrechetInceptionDistance
 import torch
 import torch.nn.functional as F
 
-def calculate_fid_score(generator, dev_dataloader, batch_size=128, num_dims=100, device="cuda"):
+def calculate_fid_score(generator, dev_dataloader, num_dims=100, device="cuda"):
     fid = FrechetInceptionDistance().to(device)
     generator.eval()
 

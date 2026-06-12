@@ -137,7 +137,7 @@ def main(num_epochs, root_dir, batch_size, lr, beta1, beta2, num_dims, step, sav
         lossesDis.append(total_lossDis)
         lossesGen.append(total_lossGen)
 
-        fid_score =  calculate_fid_score(gen_ema, dev_dataloader, batch_size, num_dims, device)
+        fid_score =  calculate_fid_score(gen_ema, dev_dataloader, num_dims, device)
         print(f"    FID score = {fid_score}")
         if fid_score < best_fid_score:
             # Save best model
