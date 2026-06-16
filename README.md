@@ -25,7 +25,7 @@ This project uses the **AFHQ-v2 (Animal Faces-HQ v2)** dataset, which contains h
 | :---------------:  | :--------:     | :--------:                                     | 
 | DCGAN v.0          |  43.1442       |      Implemented as in the DCGAN paper         |
 | DCGAN v.1          |  37.3660       |   Replacing ReLU with GeLU in Generator        |
-| DCGAN v.2          |  **31.2451**       |   Replacing BatchNorm with PixelNorm and use residual connection in Generator, EMA (decay=0.996) for generate image      |
+| DCGAN v.2          |  **31.2451**       |   Replacing BatchNorm with PixelNorm and use residual connection in Generator, EMA (decay=0.9996) for generate image      |
 ### Setting for training
 All experiments are configured with the same hyper-parameters:
 ```python
