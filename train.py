@@ -23,7 +23,7 @@ def save_checkpoint(model, filename, save_pth):
 def update_ema(gen_ema, gen, decay=0.999):
     with torch.no_grad():
         for p_ema, p in zip(gen_ema.parameters(), gen.parameters()):
-            p_ema.data.mul_(decay).add_(p.data, alpha=1 - decay)
+            p_ema.mul_(decay).add_(p, alpha=1 - decay)
 
 # Train model in 1 epoch
 def train_model(train_dataloader, epoch, gen, gen_ema, dis, genOptimizer, disOptimizer, criterion, num_dims, device, save_pth, decay):
